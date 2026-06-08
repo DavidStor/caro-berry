@@ -87,8 +87,11 @@ const Game = {
 		endTitle: document.getElementById('game-end-title'),
 		statusValue: document.getElementById('game-highscore-value'),
 		nextFruitImg: document.getElementById('game-next-fruit'),
+		winContainer: document.getElementById('game-win-container'),
+		winContinue: document.getElementById('game-win-continue'),
 		previewBall: null,
 	},
+	tier11Reached: false,
 	cache: { highscore: 0 },
 	sounds: {
 		click: new Audio('./assets/click.mp3?v=2'),
@@ -235,6 +238,10 @@ const Game = {
 		}
 
 		Events.on(mouseConstraint, 'mousedown', menuMouseDown);
+
+		Game.elements.winContinue.addEventListener('click', () => {
+			Game.hideWinPopup();
+		});
 	},
 
 	startGame: function () {
@@ -308,8 +315,23 @@ const Game = {
 				Composite.add(engine.world, Game.generateFruitBody(midPosX, midPosY, newSize));
 				Game.addPop(midPosX, midPosY, bodyA.circleRadius);
 				Game.calculateScore();
+
+				if (newSize === Game.fruitSizes.length - 1 && !Game.tier11Reached) {
+					Game.tier11Reached = true;
+					Game.showWinPopup();
+				}
 			}
 		});
+	},
+
+	showWinPopup: function () {
+		Game.elements.winContainer.style.display = 'flex';
+		runner.enabled = false;
+	},
+
+	hideWinPopup: function () {
+		Game.elements.winContainer.style.display = 'none';
+		runner.enabled = true;
 	},
 
 	addPop: function (x, y, r) {

@@ -149,6 +149,70 @@
       width: 24px;
       height: 24px;
     }
+
+    #game-win-container {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--col-shadow);
+      pointer-events: initial;
+    }
+
+    #game-win {
+      text-align: center;
+      padding: 24px 32px;
+      background-color: var(--col-bg-lighter);
+      border: 5px solid var(--col-primary);
+      box-shadow: 0 4px 32px var(--col-shadow);
+      border-radius: 32px;
+      margin: 0 auto;
+      pointer-events: initial;
+      user-select: initial;
+      max-width: 85%;
+      max-height: 90%;
+      overflow-y: auto;
+    }
+
+    #game-win-img {
+      display: block;
+      max-width: 100%;
+      max-height: 360px;
+      width: auto;
+      height: auto;
+      border-radius: 16px;
+      margin: 0 auto 20px auto;
+    }
+
+    #game-win-title {
+      font-weight: 700;
+      font-size: 42px;
+      color: var(--col-primary-dark);
+      margin-bottom: 12px;
+    }
+
+    #game-win-continue {
+      display: inline-block;
+      color: var(--col-white);
+      font-size: 24px;
+      text-decoration: none;
+      background-color: var(--col-primary-light);
+      margin-top: 16px;
+      padding: 16px 32px;
+      border-radius: 16px;
+      box-shadow: 4px 4px 0 var(--col-shadow);
+      border: none;
+      font-family: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    #game-win-continue:hover {
+      background-color: var(--col-primary);
+      box-shadow: 6px 6px 0 var(--col-shadow);
+    }
   </style>
 </head>
 <body>
@@ -161,6 +225,14 @@
           <div id="game-end">
             <div id="game-end-title">Game Over!</div>
             <a id="game-end-link" href="">Try Again</a>
+          </div>
+        </div>
+
+        <div id="game-win-container">
+          <div id="game-win">
+            <img id="game-win-img" src="./assets/img/tier11_win.png?v=1" onerror="this.style.display='none'" alt="" />
+            <div id="game-win-title">You did it 💕</div>
+            <button id="game-win-continue" type="button">Continue</button>
           </div>
         </div>
 
@@ -178,6 +250,6 @@
     </div>
   </div>
   <script type="text/javascript" src="./matter.js"></script>
-  <script type="text/javascript" src="./index.js?v=8"></script>
+  <script type="text/javascript" src="./index.js?v=9"></script>
 </body>
 </html>
