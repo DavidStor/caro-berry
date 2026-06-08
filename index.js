@@ -16,6 +16,48 @@ const {
 	Composite, Bodies, Events,
 } = Matter;
 
+// Trace the silhouette of an image by radial sampling from its center.
+// Returns vertices relative to the image's center, in pixel units.
+function extractHitboxVertices(img, numSamples = 28, alphaThreshold = 32) {
+	const w = img.naturalWidth;
+	const h = img.naturalHeight;
+	const canvas = document.createElement('canvas');
+	canvas.width = w;
+	canvas.height = h;
+	const ctx = canvas.getContext('2d');
+	ctx.drawImage(img, 0, 0);
+	const data = ctx.getImageData(0, 0, w, h).data;
+
+	const cx = w / 2;
+	const cy = h / 2;
+	const maxR = Math.max(w, h) / 2 * 1.05;
+
+	const vertices = [];
+	for (let i = 0; i < numSamples; i++) {
+		const angle = (Math.PI * 2 * i) / numSamples;
+		const dx = Math.cos(angle);
+		const dy = Math.sin(angle);
+
+		let hitR = 0;
+		const stepSize = Math.max(1, Math.floor(maxR / 256));
+		for (let r = maxR; r > 0; r -= stepSize) {
+			const px = Math.floor(cx + dx * r);
+			const py = Math.floor(cy + dy * r);
+			if (px < 0 || px >= w || py < 0 || py >= h) continue;
+			const alphaIdx = (py * w + px) * 4 + 3;
+			if (data[alphaIdx] > alphaThreshold) {
+				hitR = r;
+				break;
+			}
+		}
+
+		if (hitR <= 0) hitR = maxR * 0.25;
+		vertices.push({ x: dx * hitR, y: dy * hitR });
+	}
+
+	return vertices;
+}
+
 const wallPad = 64;
 const loseHeight = 84;
 const statusBarHeight = 48;
@@ -49,18 +91,18 @@ const Game = {
 	},
 	cache: { highscore: 0 },
 	sounds: {
-		click: new Audio('./assets/click.mp3'),
-		pop0: new Audio('./assets/pop0.mp3'),
-		pop1: new Audio('./assets/pop1.mp3'),
-		pop2: new Audio('./assets/pop2.mp3'),
-		pop3: new Audio('./assets/pop3.mp3'),
-		pop4: new Audio('./assets/pop4.mp3'),
-		pop5: new Audio('./assets/pop5.mp3'),
-		pop6: new Audio('./assets/pop6.mp3'),
-		pop7: new Audio('./assets/pop7.mp3'),
-		pop8: new Audio('./assets/pop8.mp3'),
-		pop9: new Audio('./assets/pop9.mp3'),
-		pop10: new Audio('./assets/pop10.mp3'),
+		click: new Audio('./assets/click.mp3?v=2'),
+		pop0: new Audio('./assets/pop0.mp3?v=2'),
+		pop1: new Audio('./assets/pop1.mp3?v=2'),
+		pop2: new Audio('./assets/pop2.mp3?v=2'),
+		pop3: new Audio('./assets/pop3.mp3?v=2'),
+		pop4: new Audio('./assets/pop4.mp3?v=2'),
+		pop5: new Audio('./assets/pop5.mp3?v=2'),
+		pop6: new Audio('./assets/pop6.mp3?v=2'),
+		pop7: new Audio('./assets/pop7.mp3?v=2'),
+		pop8: new Audio('./assets/pop8.mp3?v=2'),
+		pop9: new Audio('./assets/pop9.mp3?v=2'),
+		pop10: new Audio('./assets/pop10.mp3?v=2'),
 	},
 
 	stateIndex: GameStates.MENU,
@@ -90,6 +132,58 @@ const Game = {
 		{ radius: 160, scoreValue: 55, img: './assets/img/circle9.png'  },
 		{ radius: 192, scoreValue: 66, img: './assets/img/circle10.png' },
 	],
+
+	menuChrome: {
+		bgMenu:   { img: './assets/img/bg-menu.png',   targetW: 512, targetH: 512, imgWidth: 512, imgHeight: 512 },
+		btnStart: { img: './assets/img/btn-start.png', targetW: 512, targetH: 96,  imgWidth: 512, imgHeight: 96  },
+	},
+
+	preloadMenuChrome: function () {
+		return Promise.all(Object.values(Game.menuChrome).map((item) => new Promise((resolve) => {
+			const img = new Image();
+			img.onload = () => {
+				item.imgWidth = img.naturalWidth;
+				item.imgHeight = img.naturalHeight;
+				resolve();
+			};
+			img.onerror = () => resolve();
+			img.src = item.img;
+		})));
+	},
+
+	preloadFruitImages: function () {
+		return Promise.all(Game.fruitSizes.map((size) => new Promise((resolve) => {
+			const img = new Image();
+			img.onload = () => {
+				size.imgWidth = img.naturalWidth;
+				size.imgHeight = img.naturalHeight;
+				try {
+					const verts = extractHitboxVertices(img);
+					let maxDist = 0;
+					for (const v of verts) {
+						const d = Math.sqrt(v.x * v.x + v.y * v.y);
+						if (d > maxDist) maxDist = d;
+					}
+					size.outlineVerts = verts;
+					size.outlineMaxDist = maxDist;
+				} catch (err) {
+					console.warn('Outline extraction failed for', size.img, err);
+					size.outlineVerts = null;
+					size.outlineMaxDist = 0;
+				}
+				resolve();
+			};
+			img.onerror = () => {
+				size.imgWidth = 1024;
+				size.imgHeight = 1024;
+				size.outlineVerts = null;
+				size.outlineMaxDist = 0;
+				resolve();
+			};
+			img.crossOrigin = 'anonymous';
+			img.src = size.img;
+		})));
+	},
 	currentFruitSize: 0,
 	nextFruitSize: 0,
 	setNextFruitSize: function () {
@@ -256,15 +350,40 @@ const Game = {
 
 	generateFruitBody: function (x, y, sizeIndex, extraConfig = {}) {
 		const size = Game.fruitSizes[sizeIndex];
-		const circle = Bodies.circle(x, y, size.radius, {
-			...friction,
-			...extraConfig,
-			render: { sprite: { texture: size.img, xScale: size.radius / 512, yScale: size.radius / 512 } },
-		});
-		circle.sizeIndex = sizeIndex;
-		circle.popped = false;
+		const w = size.imgWidth || 1024;
+		const h = size.imgHeight || 1024;
 
-		return circle;
+		let body;
+		if (size.outlineVerts && size.outlineMaxDist > 0) {
+			const scale = size.radius / size.outlineMaxDist;
+			const scaledVerts = size.outlineVerts.map((v) => ({ x: v.x * scale, y: v.y * scale }));
+			body = Bodies.fromVertices(x, y, [scaledVerts], {
+				...friction,
+				...extraConfig,
+				render: { sprite: { texture: size.img, xScale: scale, yScale: scale } },
+			});
+			if (!body) {
+				const fallbackScale = (size.radius * 2) / Math.max(w, h);
+				body = Bodies.circle(x, y, size.radius, {
+					...friction,
+					...extraConfig,
+					render: { sprite: { texture: size.img, xScale: fallbackScale, yScale: fallbackScale } },
+				});
+			}
+		} else {
+			const scale = (size.radius * 2) / Math.max(w, h);
+			body = Bodies.circle(x, y, size.radius, {
+				...friction,
+				...extraConfig,
+				render: { sprite: { texture: size.img, xScale: scale, yScale: scale } },
+			});
+		}
+
+		body.sizeIndex = sizeIndex;
+		body.popped = false;
+		if (body.circleRadius == null) body.circleRadius = size.radius;
+
+		return body;
 	},
 
 	addFruit: function (x) {
@@ -308,35 +427,64 @@ const render = Render.create({
 	}
 });
 
-const menuStatics = [
-	Bodies.rectangle(Game.width / 2, Game.height * 0.4, 512, 512, {
-		isStatic: true,
-		render: { sprite: { texture: './assets/img/bg-menu.png' } },
-	}),
+let menuStatics;
+const buildMenuStatics = () => [
+	(() => {
+		const c = Game.menuChrome.bgMenu;
+		const scale = Math.min(c.targetW / c.imgWidth, c.targetH / c.imgHeight);
+		return Bodies.rectangle(Game.width / 2, Game.height * 0.4, c.targetW, c.targetH, {
+			isStatic: true,
+			render: { sprite: { texture: c.img, xScale: scale, yScale: scale } },
+		});
+	})(),
 
 	// Add each fruit in a circle
 	...Array.apply(null, Array(Game.fruitSizes.length)).map((_, index) => {
 		const x = (Game.width / 2) + 192 * Math.cos((Math.PI * 2 * index)/12);
 		const y = (Game.height * 0.4) + 192 * Math.sin((Math.PI * 2 * index)/12);
 		const r = 64;
+		const size = Game.fruitSizes[index];
+		const w = size.imgWidth || 1024;
+		const h = size.imgHeight || 1024;
 
+		if (size.outlineVerts && size.outlineMaxDist > 0) {
+			const scale = r / size.outlineMaxDist;
+			const scaledVerts = size.outlineVerts.map((v) => ({ x: v.x * scale, y: v.y * scale }));
+			const polyBody = Bodies.fromVertices(x, y, [scaledVerts], {
+				isStatic: true,
+				render: {
+					sprite: {
+						texture: `./assets/img/circle${index}.png`,
+						xScale: scale,
+						yScale: scale,
+					},
+				},
+			});
+			if (polyBody) return polyBody;
+		}
+
+		const menuScale = (r * 2) / Math.max(w, h);
 		return Bodies.circle(x, y, r, {
 			isStatic: true,
 			render: {
 				sprite: {
 					texture: `./assets/img/circle${index}.png`,
-					xScale: r / 1024,
-					yScale: r / 1024,
+					xScale: menuScale,
+					yScale: menuScale,
 				},
 			},
 		});
 	}),
 
-	Bodies.rectangle(Game.width / 2, Game.height * 0.75, 512, 96, {
-		isStatic: true,
-		label: 'btn-start',
-		render: { sprite: { texture: './assets/img/btn-start.png' } },
-	}),
+	(() => {
+		const c = Game.menuChrome.btnStart;
+		const scale = Math.min(c.targetW / c.imgWidth, c.targetH / c.imgHeight);
+		return Bodies.rectangle(Game.width / 2, Game.height * 0.75, c.targetW, c.targetH, {
+			isStatic: true,
+			label: 'btn-start',
+			render: { sprite: { texture: c.img, xScale: scale, yScale: scale } },
+		});
+	})(),
 ];
 
 const wallProps = {
@@ -369,7 +517,10 @@ const mouseConstraint = MouseConstraint.create(engine, {
 });
 render.mouse = mouse;
 
-Game.initGame();
+Promise.all([Game.preloadFruitImages(), Game.preloadMenuChrome()]).then(() => {
+	menuStatics = buildMenuStatics();
+	Game.initGame();
+});
 
 const resizeCanvas = () => {
 	const screenWidth = document.body.clientWidth;

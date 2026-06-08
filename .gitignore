@@ -2,3 +2,11 @@ node_modules
 package.json
 package-lock.json
 *-raw.png
+
+# OS
+.DS_Store
+**/.DS_Store
+
+# Image backups and temp files
+assets/img/1.png
+assets/img/*(TEMP).png
