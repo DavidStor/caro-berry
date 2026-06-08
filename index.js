@@ -106,6 +106,7 @@ const Game = {
 		pop8: new Audio('./assets/pop8.mp3?v=2'),
 		pop9: new Audio('./assets/pop9.mp3?v=2'),
 		pop10: new Audio('./assets/pop10.mp3?v=2'),
+		winAudio: new Audio('./assets/win_audio.mp3?v=1'),
 	},
 
 	stateIndex: GameStates.MENU,
@@ -327,11 +328,20 @@ const Game = {
 	showWinPopup: function () {
 		Game.elements.winContainer.style.display = 'flex';
 		runner.enabled = false;
+		try {
+			Game.sounds.winAudio.currentTime = 0;
+			const p = Game.sounds.winAudio.play();
+			if (p && p.catch) p.catch(() => {});
+		} catch (_) {}
 	},
 
 	hideWinPopup: function () {
 		Game.elements.winContainer.style.display = 'none';
 		runner.enabled = true;
+		try {
+			Game.sounds.winAudio.pause();
+			Game.sounds.winAudio.currentTime = 0;
+		} catch (_) {}
 	},
 
 	addPop: function (x, y, r) {
